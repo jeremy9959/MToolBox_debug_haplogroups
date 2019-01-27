@@ -70,9 +70,10 @@ def parse_csv(file_handle, aplo_list=None, parent=None):
         try:
             value = parse_line(line, level, parent_level[-1])
         except ValueError, e:
+            print e
             print "parent level after, ", parent_level
             print "level is ", level
-            print value
+            #print value
             print "ERROR: Più di un valore per campo alla riga:", n+1, "oppure un aprogruppo contiene sia * che ' o -", e.args, line
             #sys.exit(2)
             raise ValueError
