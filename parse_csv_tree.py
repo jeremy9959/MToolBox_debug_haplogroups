@@ -1,50 +1,49 @@
 #!/usr/bin/env python
 
-import sys
-
-if len(sys.argv[1:]) < 2:
-	sys.stderr.write("ERROR: missing argument\nUsage:\nparse_csv_tree.py <tree.csv> <tree.new.csv>\n\n")
-	sys.exit(1)
 
 
-it,ot = sys.argv[1:]
+import getopt, sys, re, os, glob, csv
+from classifier import tree, NGclassify, consts, datatypes, parse_mhcs
+from bioinf.seqs import SeqList
+import io_modules.csv
+import io_modules.old_table
+import io_modules.serialize
+import pandas as pd
+import os.path
+sys.setrecursionlimit(100000)
 
-f = open(it,'r')
-f = f.readlines()
-o = open(ot,'w')
 
-dic_h = {}
-c = 0
-for branch in f:
-	branch = branch.split(',')
-	dic_h[c]=''
-	for x in xrange(len(branch)):
-		if branch[x] == '':
-			pass
-		else:
-			if branch[x] != "NoLabel" and branch[x][0].isupper():
-				dic_h[c] = (x,branch[x])
-				new_line = map(lambda x:str(x),branch)
-				new_line = ','.join(new_line).strip()
-				o.write(new_line+'\n')
-			elif branch[x] == "NoLabel":
-				print 'Here is the problem',c,x
-				z = c-1
-				while z > 0:
-					print dic_h[z],c
-					if dic_h[z][0] < x:
-						distance = str(c-z)
-						print "distance",distance
-						new_label = dic_h[z][1]+"_"+str(branch[x+1]).strip()
-						dic_h[c] = (x,new_label)
-						branch[x] = new_label
-						new_line = map(lambda x:str(x),branch)
-						new_line = ','.join(new_line).strip()
-						o.write(new_line+'\n')
-						break
-					else:
-						z = z-1
-			else:
-				pass
-	c += 1
-o.close()
+csvfile,out_fname = sys.argv[1:]
+
+
+#write pickle file for MToolBox
+tree_file = csv.reader(open(csvfile, 'rb'))
+
+pickle_fname = csvfile + '.pickle'
+aplo_list = io_modules.csv.parse_csv(tree_file)
+htree = tree.HaplogroupTree(aplo_list=aplo_list)
+pickle_file = open(pickle_fname, 'wb')
+pickle_file.write(htree.serialize())
+pickle_file.close()
+
+#write out alleles and haplogroups defined for HmtDB in csv file
+pickle_file = pickle_fname
+out_file = out_fname + '.csv'
+htree = tree.HaplogroupTree(pickle_data=open(pickle_file, 'rb').read())
+fh = csv.writer(open(out_file, 'wb'))
+for haplo_name in htree:
+	io_modules.old_table.write_haplogroup(fh, '', htree[haplo_name])
+
+
+
+#write haplogrups.txt tab delimited file for MToolBox
+out_file2 = out_fname + '.txt'
+hap_file = pd.read_csv(out_file,sep=',',header=None)
+subset = hap_file[[0,1,3]]
+subset.dropna(inplace=True)
+alleles = subset[1].astype(str).str.cat(subset[3])
+subset.insert(1,'Allele',alleles)
+subset = subset[[0,'Allele']]
+subset.columns=['haplogroup_code','POSITIONnucleotidic_change']
+subset.to_csv(out_file2,sep='\t',header=True,index=None)
+
